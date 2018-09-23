@@ -1,0 +1,48 @@
+version: 2
+jobs:
+  build:
+    working_directory: /app
+    docker:
+      - image: integratedexperts/circleci2-builder
+        environment:
+          COMPOSER_ALLOW_SUPERUSER: 1
+          COMPOSE_PROJECT_NAME: govcms
+    steps:
+      - checkout
+      - run:
+          name: Docker-compose validate
+          command: docker-compose config -q
+      - run:
+          name: Update codebase to follow CI configuration
+          command: |
+            sed -i -e "/###/d" docker-compose.yml
+            cp .env.default .env
+      - setup_remote_docker
+      - run:
+          name: Start amazeeio-network
+          command: docker network prune -f && docker network create amazeeio-network
+      - run:
+          name: Build project
+          command: |
+            ahoy -v build
+            docker-compose exec test dockerize -wait tcp://mariadb:3306 -timeout 1m
+      - run:
+          name: Install site
+          command: ahoy -v install -- install_configure_form.enable_update_status_module=NULL install_configure_form.enable_update_status_emails=NULL
+      - run:
+          name: Push Docker images to Dockerhub
+          command: |
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker tag govcmsdev/govcms8 govcmslagoon/govcms8
+            docker push govcmsdev/govcms8
+            docker push govcmslagoon/govcms8
+workflows:
+  version: 2
+  main:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/

@@ -1,0 +1,19 @@
+FROM amazeeio/php:7.1-cli-drupal as builder
+
+COPY . /src
+COPY composer-lagoon.json /app/composer.json
+COPY config /app/config
+COPY scripts /app/scripts
+RUN composer install --no-dev \
+    && mkdir -p /app/config/sync
+
+COPY .docker/settings/ /app/web/sites/default/
+
+FROM amazeeio/php:7.1-cli-drupal
+COPY --from=builder /app /app
+
+# Add composer bin to PATH
+ENV PATH="/app/bin:${PATH}"
+
+# Define where the Drupal Root is located
+ENV WEBROOT=web
